@@ -1,0 +1,5 @@
+{
+  "name": "V-Lab Scheduler",
+  "description": "A computer lab management system featuring a V-shaped building visualizer, shifting schedules, and Gemini-powered smart occupancy analysis.",
+  "requestFramePermissions": []
+}
