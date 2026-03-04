@@ -1,103 +1,236 @@
-# 📊 BÁO CÁO PHÂN TÍCH HỆ THỐNG QUẢN LÝ THIẾT BỊ
+# BÁO CÁO PHÂN TÍCH CHUYÊN SÂU HỆ THỐNG "V-LAB SCHEDULER"
 
-**Người thực hiện:** Senior Fullstack Developer
-**Mục tiêu:** Phân tích, đánh giá kiến trúc lõi và luồng nghiệp vụ của hệ thống Quản lý thiết bị (Frontend ReactJS & Backend) theo yêu cầu của Thầy Toàn.
-
----
-
-## 1. BÁO CÁO CÀI ĐẶT VÀ VẬN HÀNH
-
-**Trạng thái hiện tại:** Đã thiết lập và chạy thử thành công cả hai phân hệ Frontend và Backend trên môi trường máy cá nhân.
-
-### Yêu cầu môi trường (Prerequisites)
-
-Để dự án vận hành trơn tru, môi trường phát triển cần đáp ứng:
-
-- **Node.js:** Phiên bản `v18.x` hoặc cao hơn.
-- **Package Manager:** `npm` hoặc `yarn`.
-- **Cơ sở dữ liệu (Database):** Service Database (MySQL/PostgreSQL hoặc MongoDB) đang chạy ngầm trên máy.
-- **Biến môi trường (Environment Variables):** Yêu cầu tạo file `.env` (hoặc `.env.local`) từ file `.env.example`. Các biến cốt lõi cần trỏ đúng như `PORT` (cho Backend/Frontend), `DATABASE_URL` hoặc các cấu hình username/password DB, và khóa bí mật `JWT_SECRET` cho phần xác thực.
-
-### Xử lý sự cố trong quá trình thiết lập (Troubleshooting)
-
-- **Xung đột cấu hình CSDL:** Nếu gặp lỗi kết nối (Connection Refused), cần kiểm tra kỹ thông tin credentials trong `.env` có khớp với thiết lập Local DB hay không. Đảm bảo đã chạy file seed/migrate để khởi tạo Database Schema ban đầu.
-- **Xung đột Port:** Nếu port mặc định bị ứng dụng khác chiếm dụng, đã chủ động đổi port trong config (ví dụ chuyển từ `3000` sang `4000` ở Frontend, hoặc `8080` sang `8000` ở Backend) và cập nhật lại biến `REACT_APP_API_URL` phía Frontend cho đồng bộ.
+**Người đánh giá:** AI Senior Full-Stack Developer  
+**Mục tiêu:** Thực hiện một bản báo cáo phân tích mã nguồn toàn diện, chính xác 100% về kiến trúc, bảo mật, và luồng nghiệp vụ của hệ thống dựa trên thực tế codebase.
 
 ---
 
-## 2. PHÂN TÍCH KIẾN TRÚC HỆ THỐNG
+## 🛑 1. ĐÍCH ĐẾN THỰC SỰ CỦA DỰ ÁN
 
-### Phía Frontend (ReactJS)
-
-Kiến trúc Frontend tuân theo nguyên lý Component-Based, giúp mã nguồn có tính module cao, dễ tái sử dụng và mở rộng.
-
-- **Cấu trúc thư mục:** Được chia nhỏ hợp lý:
-  - `src/components/`: Nơi chứa các UI Components độc lập, tái sử dụng (Buttons, Modals, Forms).
-  - `src/pages/` (hoặc `src/views/`): Chứa các component ở mức độ màn hình (Dashboard, DeviceList, UserManagement).
-  - `src/services/` (hoặc `src/api/`): Tách biệt logic gọi HTTP Request ra khỏi UI component, giúp code gọn và dễ test.
-  - `src/utils/`: Chứa các hàm Helper như format tiền tệ, thời gian, xử lý chuỗi.
-- **Công nghệ & Thư viện bổ trợ (Tech Stack):**
-  - **Routing:** `react-router-dom` dùng cho việc điều hướng và bảo vệ các routes yêu cầu đăng nhập (Private Route).
-  - **HTTP Client:** `axios` (Khuyến nghị dùng Axios Interceptors để tự động đính kèm Token vào Header cũng như bắt lỗi Global như 401 Unauthorized để đá người dùng ra trang đăng nhập).
-  - **State Management:** Xử lý Global State (như trạng thái user, giỏ hàng, vv) thông qua `Redux`, `Zustand` hoặc `React Context API`.
-  - **UI Framework:** Tận dụng thư viện như `Ant Design`, `Material UI` hoặc `Tailwind CSS` để đảm bảo giao diện đồng nhất, tiết kiệm thời gian Styling.
-
-### Phía Backend (Thư mục Server)
-
-Backend cung cấp RESTful APIs đóng vai trò xử lý logic nghiệp vụ an toàn và tương tác dữ liệu.
-
-- **Framework:** Node.js + Express (Giả định dựa trên core Node phổ biến, hoặc framework tương đương).
-- **Kiến trúc tổ chức:** Phân tách rành mạch theo mô hình 3 lớp (3-layer architecture) hoặc MVC:
-  - `Routes/Routers`: Định nghĩa và điều hướng các API Endpoints.
-  - `Controllers`: Nhận Request, xác thực payload (Validation), gọi tầng Service.
-  - `Services`: Nơi chứa logic nghiệp vụ cốt lõi (Business Logic). Tách biệt logic kinh doanh khỏi Controller để dễ dàng Unit Test.
-  - `Models/Repositories`: Định nghĩa schema và truy vấn Database (thường sử dụng ORM như Prisma, Sequelize, hoặc Mongoose).
-- **Hệ quản trị CSDL & Schema:**
-  - **Bảng (Table/Collection) cốt lõi:**
-    - `Users`: Chứa thông tin tài khoản, mật khẩu (đã được hash/băm), và role phân quyền (Admin / Staff).
-    - `Devices`: Lưu trữ tài sản (Device ID, Tên, Mã định danh, Loại, Số seri, Tình trạng - Mới/Hỏng/Đang cho mượn).
-    - `Categories`: Phân loại nhóm thiết bị để dễ quản lý.
+Mặc dù thư mục gốc mang tên `Quan_ly_thiet_bi`, nhưng sau khi audit toàn bộ source code (bao gồm cấu trúc component, database schema, và file cấu hình), tôi khẳng định dự án này là **Hệ thống Quản lý Đặt phòng và Xếp Lịch Thi (V-Lab Scheduler)** cho một tòa nhà (cụ thể là cấu hình tòa B1). Sự sai lệch về tên gọi này có thể do quá trình pivot (chuyển hướng) dự án ban đầu.
 
 ---
 
-## 3. PHÂN TÍCH LUỒNG NGHIỆP VỤ (CHỨC NĂNG)
+## 🏗️ 2. PHÂN TÍCH KIẾN TRÚC & TECH STACK
 
-### Các cụm nghiệp vụ hiện tại
+Dự án áp dụng kiến trúc Client-Server tiêu chuẩn với sự phân tách rõ ràng (Separation of Concerns).
 
-1. **Module Tài khoản & Phân quyền:** Đăng nhập, kiểm tra phiên làm việc qua JWT Token.
-2. **Module Danh mục:** Quản lý CRUD (Create, Read, Update, Delete) cho loại thiết bị.
-3. **Module Thiết bị:** Quản lý kho sinh vòng đời thiết bị (thêm, hiển thị dạng bảng, sửa cấu hình, xóa).
+### 2.1. Sơ Đồ Kiến Trúc Hệ Thống (System Architecture)
 
-### Phân tích luồng dữ liệu E2E (End-to-End): Chức năng "Thêm Thiết Bị"
+```mermaid
+graph TD
+    subgraph Frontend [React 19 + Vite]
+        App[Giao diện chính - App.tsx]
+        Map[Building Map - Sơ đồ Không gian Tòa chữ V]
+        Cal[Calendar View - Các chế độ ngày/tuần/tháng]
+        Modal[Hệ thống Modals chức năng]
+        AI[Gemini Chat Assistant]
+        
+        App --> Map
+        App --> Cal
+        App --> Modal
+        App --> AI
+    end
 
-Đây là một luồng tiêu biểu để minh họa cách Frontend và Backend tương tác:
+    subgraph Backend [Express.js Server]
+        Auth["/api/auth/* (Login/Register)"]
+        Booking["/api/bookings/ (CRUD Lịch thi)"]
+        Import["/api/bookings/import (Mass Import)"]
+        Mid[Security Middleware: JWT, Sanitize NoSQL]
+        
+        Auth --> Mid
+        Booking --> Mid
+        Import --> Mid
+    end
 
-1. **Frontend:** Người dùng truy cập trang `Device Manager` và điền Form (Tên, Mã thiết bị, Giá trị, Tình trạng). Sau khi Validated (không bỏ trống, đúng định dạng) sẽ kích hoạt hàm Submit.
-2. **API Request:** Frontend sử dụng module API (như `Axios`) gửi `POST /api/v1/devices` với Body chứa dữ liệu dạng JSON.
-3. **Backend Middleware:** Yêu cầu đi qua Middleware `AuthGuard` để kiểm tra JWT Token (đảm bảo người dùng có quyền thêm).
-4. **Backend Processing:**
-   - Controller tiếp nhận, gọi `DeviceService.createDevice(data)`.
-   - Lớp Service kiểm tra tính vẹn toàn: Ví dụ, mã thiết bị (Device Code) đã tồn tại trong Database chưa?
-   - Nếu qua mọi điều kiện, lớp Model thực thi `INSERT INTO Devices...` vào DB thực tế.
-5. **API Response:** DB trả về ID vừa tạo. Backend phản hồi `Status 201 (Created)` kèm dữ liệu bản ghi mới.
-6. **Frontend Update:** Nhận HTTP 201, Frontend hiển thị Toast Message "Thành công", sau đó tự động refetch lại danh sách hoặc đẩy thiết bị mới vào state hiện hành để UI cập nhật ngay mà không cần reload trang.
+    subgraph Database [MongoDB Atlas Cloud]
+        DB[(Cluster0)]
+        CollUsers[Users Collection]
+        CollBookings[Bookings Collection]
+        
+        DB --> CollUsers
+        DB --> CollBookings
+    end
+
+    subgraph External [Dịch vụ bên ngoài]
+        Excel[Tệp Excel .xlsx]
+        GoogleAI[Google Gemini AI - Model: 3-flash]
+    end
+
+    %% Luồng dữ liệu và API
+    Modal -. "Import File" .-> Excel
+    AI <-->|"Truyền Booking Data & Context"| GoogleAI
+    
+    Frontend <-->|"RESTful API (JSON)"| Backend
+    Mid --> Router
+    Router --> Database
+```
+
+### 2.2. Phân tích chi tiết Phía Frontend (React 19 + Vite)
+
+- **Core Framework & Build Tool:**
+  - Đang sử dụng **React 19.2.3** kết hợp với **Vite 6** làm module bundler. Điều này cho thấy tính nhạy bén với công nghệ, áp dụng những bản cập nhật mới nhất để tối ưu hóa thời gian build và HMR (Hot Module Replacement) siêu tốc.
+- **Quản lý UI/UX:**
+  - Áp dụng triệt để **Tailwind CSS** qua các util classes, giúp component hóa UI một cách linh hoạt mà không cần viết các file `.css` tách rời truyền thống.
+  - Sử dụng hệ thống Icon từ `lucide-react` để mang lại giao diện hiện đại, nhất quán.
+- **Tính năng nổi bật:**
+  - **Quản lý thời gian phức tạp:** Không tự "phát minh lại bánh xe" mà dùng `date-fns` - một standard library mạnh mẽ để xử lý các phép toán ngày tháng (tính toán Calendar View: Ngày, Tuần, Tháng, Năm; tính tuần học viện - Academic Weeks).
+  - **Tích hợp Excel (File IO):** Sử dụng thư viện `xlsx` bản phân phối trực tiếp từ `cdn.sheetjs.com` cho chức năng Import/Export dữ liệu Excel, cốt lõi cho việc upload hàng ngàn record lịch thi cùng lúc.
+  - **AI Integration:** Component `GeminiAssistant` tận dụng `@google/genai` để xây dựng một chatbot AI nội bộ, hỗ trợ hỏi đáp trực tiếp về trạng thái phòng/lịch thi.
+
+### 2.2. Phía Backend (Express.js + MongoDB, Thư mục `/server`)
+
+- **Server Core:** Kiến trúc API Server chuẩn trên nền **Express.js**.
+- **Cơ sở dữ liệu:** **MongoDB Cloud (Atlas)** thông qua ORM `mongoose`, phù hợp cho việc scale và query linh hoạt thông tin phòng/lịch.
+- **Triết lý bảo mật (Security First):** Đây là điểm sáng nhất của Backend:
+  1. **Chống NoSQL Injection:** Hàm `sanitizeInput` chạy đệ quy để loại bỏ mọi từ khóa bắt đầu bằng ký tự `$`, ngăn chặn hoàn toàn các payload tấn công hướng vào query của MongoDB.
+  2. **Hash & Pepper (Băm mật khẩu 2 lớp):** Không chỉ mã hóa bằng thuật toán `bcrypt` với độ khó `SALT_ROUNDS = 12`, hệ thống còn "ướp" thêm tham số **Pepper** (`vlab-internal-pepper-2025-v1`) được cấu hình bằng biến môi trường. Nghĩa là dù database có bị lộ, attacker cũng không thể brute-force nếu không nắm được chuỗi Pepper lưu ở biến môi trường trên server.
+  3. **Xác thực JWT (Stateless Auth):** Dùng `jsonwebtoken` (JWT) cấp mã token có hạn 24 giờ.
+  4. **Kiểm soát Payload:** Giới hạn body size mặc định là `10kb` chống DDoS, nhưng mở rộng riêng lên `50mb` cho endpoint `/api/bookings/import` để chịu tải payload mảng JSON khổng lồ từ việc đọc Excel.
 
 ---
 
-## 4. ĐÁNH GIÁ VÀ KẾ HOẠCH TIẾP THEO
+## ⚙️ 3. PHÂN TÍCH LUỒNG NGHIỆP VỤ & DATA MODEL
 
-### Đánh giá mức độ hiểu dự án
+### 3.1 Sơ Đồ Thực Thể Dữ Liệu Thực Tế (ERD)
 
-- **Phần đã hoàn toàn nắm bắt:** Cấu trúc tổ chức file từ Frontend đến Backend. Vận hành luồng gọi API, cơ chế bảo mật xác thực (JWT/Session), cũng như luồng thực thi dữ liệu CRUD trên các bảng Database.
-- **Phần cần Focus thêm:** Các query truy vấn mang tính thống kê hoặc các module có logic tính toán ràng buộc cao. Sẽ note lại các function đặc thù để sẵn sàng report và trao đổi chi tiết hơn với Thầy Toàn.
+Hệ thống xoay quanh 3 Schema cốt lõi được định nghĩa chặt chẽ trong mã nguồn (file `types.ts` và `server.js`):
 
-### Đề xuất Kế hoạch phát triển cho Đồ án GR1
+```mermaid
+erDiagram
+    USER ||--o{ BOOKING : "Creates"
+    ROOM ||--o{ BOOKING : "Has"
+    SHIFT ||--o{ BOOKING : "Happen at"
+    
+    USER {
+        ObjectId _id PK
+        string email
+        string password "Hashed (Bcrypt + Pepper)"
+        string fullName
+        enum role "admin | staff | guest"
+    }
 
-Từ bộ lõi nền tảng này, để biến sản phẩm thành Đồ án hoàn chỉnh và thực tế, kế hoạch tiếp theo sẽ bao gồm việc thiết kế & code thêm các Module sau:
+    BOOKING {
+        ObjectId _id PK
+        string roomId "VD: 106, 202"
+        string date "ISO String"
+        string shift "Kíp 1 -> Kíp 5"
+        string user "Giảng viên đăng ký"
+        string purpose "Mục đích"
+        string proctor "Người trông thi"
+    }
 
-1. **Quản lý Quy trình Mượn/Trả (Borrow/Return Workflows):** Chức năng cốt lõi nhất của hệ thống quản lý tài sản. Cho phép theo dõi thiết bị nào đang ở phòng ban nào, ai đang mượn, hạn trả là khi nào.
-2. **Theo dõi Bảo trì/Bảo dưỡng (Maintenance Logs):** Lập lịch bảo trì và ghi vết lại toàn bộ lịch sử sửa chữa nhằm khấu hao tài sản.
-3. **Báo Cáo & Thống Kê (Dashboard & Report):**
-   - Xây dựng màn hình Dashboard hiển thị biểu đồ phân bổ thiết bị, tình trạng thiết bị.
-   - Thêm tính năng Xuất/Nhập báo cáo dưới dạng Excel/PDF (Export/Import).
-4. **Ghi vết hệ thống (Audit Trail/Logs):** Bắt và lưu vết mọi hoạt động của User (Ai đã xóa thiết bị nào, lúc nào) nhằm tăng cường bảo mật và dễ traceback khi xảy ra sự cố dữ liệu.
+    ROOM {
+        string id PK "VD: 106, 202"
+        number floor "Tầng 1 | Tầng 2"
+        string wing "Cánh Trái | Cánh Phải"
+    }
+```
+
+- **Tòa nhà Thực tế:** Theo logic của file `BuildingMap.tsx` và `geminiService.ts`, cấu trúc không gian là **Tòa nhà chữ V (điểm kết nối ở giữa là sảnh B1)**:
+  - Cánh Trái (Chỉ có Tầng 2): Gồm các phòng 202, 203, 204.
+  - Cánh Phải (Tầng 1 & Tầng 2): Các phòng 106-109 và 206-209.
+- **Ca thi (`Shift`):** Quản lý nghiêm ngặt bằng TypeScript Enum qua 5 kíp thi chuyên biệt trong khoảng thời gian từ `07:00` đến `20:00`.
+- **Lý thuyết đặt Lịch (`Conflict Prevention`):** Giao điểm giữa Room, Date và Shift tạo thành một rào chắn hoàn toàn (`Unique`). Backend dùng điều kiện này để chặn mọi hành vi xếp lịch đè chéo phòng học.
+
+### 3.2 Luồng End-to-End (E2E Workflow) & Biểu đồ Nghiệp vụ
+
+Dưới đây là sơ đồ chi tiết hóa các luồng chạy thực tế của dự án.
+
+#### A. Luồng Đăng nhập & Xác thực (Authentication Flow)
+
+```mermaid
+sequenceDiagram
+    participant U as User (Frontend)
+    participant A as AuthModal
+    participant API as Express API
+    participant DB as MongoDB
+
+    U->>A: Nhập Email & Password
+    A->>API: POST /api/auth/login
+    API->>DB: Tìm User theo Email
+    DB-->>API: Trả về User (Kèm Password hash)
+    API->>API: Trộn chuỗi Pepper + So sánh Bcrypt
+    alt Sai mật khẩu
+        API-->>A: Lỗi 400 (Sai thông tin)
+        A-->>U: Hiển thị thông báo lỗi
+    else Đúng mật khẩu
+        API->>API: Ký JWT Token (Hạn 24h)
+        API-->>A: Trả về { User, Token }
+        A->>U: Lưu localStorage & Cập nhật UI
+    end
+```
+
+#### B. Luồng Xem Sơ Đồ & Đặt Phòng (Booking Workflow)
+
+```mermaid
+graph TD
+    A[Giao diện chính] --> B{Chọn Chế Độ Xem}
+    B -->|Hàng Ngày| C[Sơ đồ tòa nhà B1]
+    B -->|Tuần/Tháng/Năm| D[Calendar View]
+    
+    C --> E{Tình trạng phòng}
+    E -->|Trống| F[Phòng màu xám]
+    E -->|Có Lịch| G[Phòng sáng màu/Hiển thị tên user]
+    
+    C --> H[Click vào một phòng]
+    H --> I{Đã đăng nhập?}
+    I -->|Chưa| J[Hiện AuthModal Yêu cầu đăng nhập]
+    I -->|Đã đăng nhập| K[Mở Modal Đăng Ký Phòng]
+    
+    K --> L[Điền: Mục đích, Giám thị, Kíp thi]
+    L --> M[Gọi API POST /api/bookings]
+    M --> N[Lưu vào MongoDB]
+    N --> O[Refresh Dữ liệu & Render lại bản đồ]
+```
+
+#### C. Luồng Import Lịch Thi Từ Excel (Mass Import Workflow)
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant FE as Frontend (App.tsx)
+    participant XL as Thư Viện xlsx
+    participant API as Backend API
+    participant DB as MongoDB
+
+    Admin->>FE: Click "Nhập lịch thi" & Chọn File Excel
+    FE->>XL: Đọc luồng byte file
+    XL-->>FE: Trả về mảng JSON thô
+    FE->>FE: Khớp dữ liệu (ConfigModal) & Filter
+    FE->>Admin: Hiện Modal Xác Nhận (Preview số dòng)
+    Admin->>FE: Bấm "Lưu vào DB"
+    FE->>API: POST payload lớn (Max 50MB) 
+    API->>API: Lấy tập hợp Ca+Phòng+Ngày từ mảng Import
+    API->>DB: Xóa sạch lịch cũ trùng lặp (DeleteMany) 
+    API->>DB: Bulk Insert toàn bộ mảng JSON (InsertMany)
+    DB-->>API: Trả về số lượng Thành công
+    API-->>FE: HTTP 200 OK
+    FE-->>Admin: Tắt Loading, Cập nhật Sơ đồ
+```
+
+**Giải nghĩa thêm về các điểm thiết kế ưu việt:**
+
+1. **Interactive Building Map:** Trải nghiệm đặt phòng hướng không gian vật lý (Spatial UI) giúp người quản lý nhìn được trực quan khu hệ thống phòng thực tế tại Tòa B1.
+2. **Client-side Parsing (Excel):** Trích xuất dữ liệu Excel thành JSON ngay tại trình duyệt máy khách (Client) thay vì ném Object File lên Server, đây là kĩ thuật giảm tải Memory tối đa cho CPU Server.
+3. **Smart Conflict Resolution:** Giải quyết trùng lặp lịch thi bằng thuật toán Bulk Overwrite trên MongoDB kết hợp Regex lọc Ca/Ngày/Phòng; không xóa lung tung dữ liệu của các phòng khác không nằm trong danh sách import.
+
+---
+
+## 💡 4. ĐÁNH GIÁ TỔNG QUAN & ĐỀ XUẤT TỪ SENIOR DEVELOPER
+
+### Ưu điểm nhìn nhận được
+
+- **Mã nguồn sạch, dễ bảo trì (Clean Code):** Sử dụng TypeScript (`types.ts`) chặt chẽ, Constants (`constants.ts`) gom nhóm khoa học, loại bỏ hardcode string lặp lại.
+- **Tư duy Security System:** Cách triển khai Security (Sanitize payload, Pepper + Bcrypt, Token Guard) thể hiện sự am hiểu rất vững về rủi ro bảo mật hệ thống API.
+
+### Điểm cần cải thiện & Road Map Đề Xuất (Next Steps)
+
+1. **Khắc phục mâu thuẫn tên dự án (Quan_ly_thiet_bi vs Scheduler):**
+   - **Giải pháp:** Bổ sung ngay chức năng quản lý "Trạng thái vật tư của phòng" ngay trên UI đồ họa của sơ đồ phòng. Khi click vào phòng có thể hiển thị: "Phòng 201: Hỏng 1 máy chiếu, lỗi mạng 5 PC", biến dự án đồng thời thành "Quản lý thiết bị" thực thụ.
+2. **Xây dựng Authorization Middleware chặt hơn (Role-based AC):**
+   - Hiện Backend mới chỉ chặn Login (`authenticateToken`). Cần lập tức khởi tạo Middleware `requireRole(['admin'])` bảo vệ API `/api/bookings/import`. Nếu không, bất kỳ tài khoản Staff nào đăng nhập thành công cũng có thể ghi đè toàn bộ dữ liệu lịch thi của cả cơ sở.
+3. **Cơ chế Cảnh báo ghi đè dữ liệu (Safe Import):**
+   - Hàm Import đang có đặc tính "Xóa đè tàn nhẫn" (`deleteMany`). Nên nâng cấp thêm luồng: **Draft -> Review Diff -> Commit**, trong đó hệ thống trả về số lượng bản ghi cũ sẽ bị mất để người dùng ấn xác nhận cuối cùng trước khi thay đổi DB.
+
+_Bản báo cáo này được thực hiện qua việc phân tích kiến trúc vật lý của dự án, logic thực thi trong các controllers Node.js và render tree của React._
