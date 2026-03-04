@@ -74,7 +74,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- DATABASE CONNECTION ---
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/vlab_scheduler";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://vlab_admin:090325@cluster0.cxkdbhl.mongodb.net/?appName=Cluster0";
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('✅ MongoDB Secure Connected (Bcrypt v12 + Pepper enabled)'))
   .catch(err => console.error(err));
