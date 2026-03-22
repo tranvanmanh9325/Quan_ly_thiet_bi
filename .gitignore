@@ -28,3 +28,6 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Báo cáo - không cần thiết trên Git
+Bao_cao/
