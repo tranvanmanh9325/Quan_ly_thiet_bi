@@ -1,0 +1,35 @@
+services:
+  # ─── BACKEND ────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: vlab-backend
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    ports:
+      - "5000:5000"
+    networks:
+      - vlab-net
+
+  # ─── FRONTEND ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Đọc từ .env ở root để truyền vào lúc build
+        GEMINI_API_KEY: ${GEMINI_API_KEY}
+    container_name: vlab-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - vlab-net
+
+networks:
+  vlab-net:
+    driver: bridge

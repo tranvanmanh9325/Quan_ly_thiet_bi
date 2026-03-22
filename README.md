@@ -5,6 +5,141 @@
 
 ---
 
+## 🐳 HƯỚNG DẪN CHẠY VỚI DOCKER
+
+### Yêu cầu
+
+| Công cụ | Phiên bản tối thiểu |
+|---|---|
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | 24+ |
+| Docker Compose | V2 (tích hợp sẵn trong Docker Desktop) |
+
+---
+
+### Cấu trúc file Docker
+
+```
+Quan_ly_thiet_bi/
+├── Dockerfile              ← Frontend (multi-stage: Vite build → nginx)
+├── nginx.conf              ← Cấu hình nginx (SPA fallback + cache)
+├── docker-compose.yml      ← Orchestrate toàn bộ service
+├── .dockerignore
+├── .env                    ← Biến môi trường cho frontend (GEMINI_API_KEY)
+└── server/
+    ├── Dockerfile          ← Backend (Node 20 Alpine)
+    ├── .dockerignore
+    └── .env                ← Biến môi trường cho backend
+```
+
+---
+
+### Cấu hình biến môi trường
+
+> **⚠️ QUAN TRỌNG:** Phải cấu hình đúng 2 file `.env` trước khi chạy Docker.
+
+**File `.env` (root — dành cho Frontend):**
+
+```env
+GEMINI_API_KEY=your_google_gemini_api_key_here
+```
+
+**File `server/.env` (dành cho Backend):**
+
+```env
+PORT=5000
+MONGODB_URI=mongodb+srv://<user>:<password>@cluster0.xxx.mongodb.net/?appName=Cluster0
+JWT_SECRET=your_long_random_jwt_secret_here
+PASS_PEPPER=your_secret_pepper_string_here
+```
+
+---
+
+### Các lệnh Docker thường dùng
+
+#### ▶️ Khởi động lần đầu (hoặc sau khi thay đổi code)
+
+```bash
+docker compose up --build -d
+```
+
+> Lệnh này sẽ build image mới và khởi động tất cả container ở chế độ nền (`-d`).
+
+#### ▶️ Khởi động lại (không build lại)
+
+```bash
+docker compose up -d
+```
+
+#### ⏹️ Dừng tất cả container
+
+```bash
+docker compose down
+```
+
+#### 🔄 Dừng và xoá volume (reset hoàn toàn)
+
+```bash
+docker compose down -v
+```
+
+#### 📋 Xem trạng thái các container
+
+```bash
+docker compose ps
+```
+
+#### 📄 Xem log realtime
+
+```bash
+# Tất cả service
+docker compose logs -f
+
+# Chỉ backend
+docker compose logs -f backend
+
+# Chỉ frontend
+docker compose logs -f frontend
+```
+
+#### 🔧 Truy cập vào container để debug
+
+```bash
+# Vào shell của backend
+docker compose exec backend sh
+
+# Vào shell của frontend (nginx)
+docker compose exec frontend sh
+```
+
+#### 🗑️ Dọn dẹp image cũ không dùng
+
+```bash
+docker image prune -f
+```
+
+---
+
+### URL sau khi chạy thành công
+
+| Service | URL |
+|---|---|
+| **Frontend** | http://localhost:3000 |
+| **Backend API** | http://localhost:5000 |
+
+---
+
+### Lưu ý khi build lại
+
+`GEMINI_API_KEY` được **embed vào JavaScript bundle** lúc build (do Vite). Vì vậy:
+
+- Nếu thay đổi `GEMINI_API_KEY` → **bắt buộc** phải chạy `docker compose up --build -d`.
+- Nếu chỉ thay đổi code backend → chỉ rebuild service backend:
+  ```bash
+  docker compose up --build -d backend
+  ```
+
+---
+
 ## 🛑 1. ĐÍCH ĐẾN THỰC SỰ CỦA DỰ ÁN
 
 Mặc dù thư mục gốc mang tên `Quan_ly_thiet_bi`, nhưng sau khi audit toàn bộ source code (bao gồm cấu trúc component, database schema, và file cấu hình), tôi khẳng định dự án này là **Hệ thống Quản lý Đặt phòng và Xếp Lịch Thi (V-Lab Scheduler)** cho một tòa nhà (cụ thể là cấu hình tòa B1). Sự sai lệch về tên gọi này có thể do quá trình pivot (chuyển hướng) dự án ban đầu.
