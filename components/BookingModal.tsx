@@ -13,16 +13,19 @@ interface BookingModalProps {
   initialRoomId?: string;
   rooms: Room[];
   bookings: Booking[];
+  editingBooking?: Booking | null;
 }
 
-const BookingModal: React.FC<BookingModalProps> = ({ onClose, onSubmit, initialDate, initialShift, initialRoomId, rooms, bookings }) => {
+const BookingModal: React.FC<BookingModalProps> = ({ onClose, onSubmit, initialDate, initialShift, initialRoomId, rooms, bookings, editingBooking }) => {
+  const isEditMode = !!editingBooking;
+
   const [formData, setFormData] = useState({
-    roomId: initialRoomId || '106',
-    date: format(initialDate, 'yyyy-MM-dd'),
-    shift: initialShift,
-    user: '',
-    purpose: '',
-    proctor: ''
+    roomId: editingBooking?.roomId || initialRoomId || '106',
+    date: editingBooking ? editingBooking.date : format(initialDate, 'yyyy-MM-dd'),
+    shift: editingBooking?.shift || initialShift,
+    user: editingBooking?.user || '',
+    purpose: editingBooking?.purpose || '',
+    proctor: editingBooking?.proctor || ''
   });
 
   // Re-sync if props change while modal is somehow still open or remounting
@@ -35,6 +38,8 @@ const BookingModal: React.FC<BookingModalProps> = ({ onClose, onSubmit, initialD
   const isRoomOccupied = (roomId: string) => {
     const targetDate = parseISO(formData.date);
     return bookings.some(b => 
+      // Skip the booking being edited to allow keeping same room/shift
+      (isEditMode ? b.id !== editingBooking!.id : true) &&
       isSameDay(new Date(b.date), targetDate) && 
       b.shift === formData.shift && 
       b.roomId === roomId
@@ -48,8 +53,8 @@ const BookingModal: React.FC<BookingModalProps> = ({ onClose, onSubmit, initialD
       <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
         <div className="px-6 py-6 bg-indigo-600 text-white flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-xl font-bold">Đăng ký sử dụng phòng</h2>
-            <p className="text-indigo-100 text-xs mt-1">Vui lòng điền đầy đủ thông tin bên dưới</p>
+            <h2 className="text-xl font-bold">{isEditMode ? 'Chỉnh sửa lịch thi' : 'Đăng ký sử dụng phòng'}</h2>
+            <p className="text-indigo-100 text-xs mt-1">{isEditMode ? 'Cập nhật thông tin lịch thi bên dưới' : 'Vui lòng điền đầy đủ thông tin bên dưới'}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <X className="w-6 h-6" />
@@ -180,7 +185,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ onClose, onSubmit, initialD
               disabled={isCurrentRoomUnavailable}
               className={`flex-[2] py-3 text-white rounded-xl font-bold shadow-lg transition-all ${isCurrentRoomUnavailable ? 'bg-slate-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
             >
-              Xác nhận đăng ký
+              {isEditMode ? 'Lưu thay đổi' : 'Xác nhận đăng ký'}
             </button>
           </div>
         </form>

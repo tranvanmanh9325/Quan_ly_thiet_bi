@@ -1,13 +1,13 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
-  ChevronLeft, ChevronRight, Plus, Search, Layers, Clock, UserCheck, Calendar as CalendarIcon,
-  FileUp, BarChart3, Settings, Loader2, CheckCircle2, Download, AlertCircle, Check, RotateCcw,
-  LogOut, User as UserIcon, Wifi, WifiOff, RefreshCw
+  ChevronLeft, ChevronRight, Plus, Layers, Calendar as CalendarIcon,
+  FileUp, BarChart3, Settings, Loader2, AlertCircle,
+  LogOut, User as UserIcon, WifiOff, RefreshCw
 } from 'lucide-react';
-import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears, isSameDay, startOfWeek, endOfWeek, isValid, isWithinInterval } from 'date-fns';
+import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears, isSameDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isValid, isWithinInterval } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
+
 import { ROOMS, SHIFTS, DEFAULT_IMPORT_CONFIG, DEFAULT_ACADEMIC_WEEKS, SHIFT_DETAILS } from './constants';
 import { Booking, Shift, ViewType, DutyStaff, Room, ImportConfig, AcademicWeek, User } from './types';
 import BuildingMap from './components/BuildingMap';
@@ -17,8 +17,8 @@ import DutyStaffModal from './components/DutyStaffModal';
 import BookingDetailModal from './components/BookingDetailModal';
 import ConfigModal from './components/ConfigModal';
 import StatsModal from './components/StatsModal';
-import GeminiAssistant from './components/GeminiAssistant';
 import AuthModal from './components/AuthModal';
+import ImportExcelModal from './components/ImportExcelModal';
 
 const API_BASE_URL = "http://localhost:5000/api";
 const API_BOOKINGS_URL = `${API_BASE_URL}/bookings`;
@@ -27,12 +27,6 @@ const API_AUTH_ME_URL = `${API_BASE_URL}/auth/me`;
 interface AuthState {
   user: User | null;
   token: string | null;
-}
-
-interface PendingImport {
-  newBookings: Booking[];
-  overwritesCount: number;
-  totalFound: number;
 }
 
 export default function App() {
@@ -62,10 +56,13 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [preSelectedRoomId, setPreSelectedRoomId] = useState<string | undefined>(undefined);
   const [isImporting, setIsImporting] = useState(false);
-  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   
   const [now, setNow] = useState(new Date());
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(new Date());
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
   const fetchBookings = async () => {
     setConnectionStatus('connecting');
@@ -111,6 +108,17 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Đóng date picker khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     if (auth.user && auth.token) {
       localStorage.setItem('vlab_user', JSON.stringify(auth.user));
@@ -152,8 +160,36 @@ export default function App() {
     }
   };
 
-  const confirmImport = async () => {
-    if (!pendingImport || !auth.token) return;
+  const handleEditBooking = async (b: Partial<Booking>) => {
+    if (!auth.token || !editingBooking) return;
+    try {
+      const response = await fetch(`${API_BOOKINGS_URL}/${editingBooking.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${auth.token}`
+        },
+        body: JSON.stringify(b)
+      });
+      if (response.ok) {
+        await fetchBookings();
+        setIsBookingModalOpen(false);
+        setEditingBooking(null);
+      } else {
+        const data = await response.json();
+        if (response.status === 401 || response.status === 403) {
+          handleLogout();
+          setIsAuthModalOpen(true);
+        }
+        alert(data.message || "Lỗi khi cập nhật lịch thi.");
+      }
+    } catch (err) {
+      alert("Lỗi kết nối tới server.");
+    }
+  };
+
+  const handleImportConfirm = async (bookings: Omit<Booking, 'id'>[]) => {
+    if (!auth.token) return;
     setIsImporting(true);
     try {
       const response = await fetch(`${API_BOOKINGS_URL}/import`, {
@@ -162,21 +198,30 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${auth.token}`
         },
-        body: JSON.stringify({ bookings: pendingImport.newBookings })
+        body: JSON.stringify({ bookings })
       });
       if (response.ok) {
         await fetchBookings();
-        setPendingImport(null);
+        alert(`✅ Nhập thành công ${bookings.length} lịch thi vào hệ thống!`);
       } else {
-        const data = await response.json();
-        if (response.status === 401 || response.status === 403) {
+        // Parse error message an toàn — body 413 không phải JSON
+        let message = `Lỗi server (HTTP ${response.status})`;
+        try {
+          const data = await response.json();
+          message = data.message || message;
+        } catch { /* body không phải JSON (vd: 413 PayloadTooLarge) */ }
+
+        if (response.status === 413) {
+          message = 'Dữ liệu quá lớn. Hãy chia nhỏ số sheet cần nhập và thử lại.';
+        } else if (response.status === 401 || response.status === 403) {
           handleLogout();
           setIsAuthModalOpen(true);
         }
-        alert(data.message || "Lỗi khi nhập dữ liệu.");
+        alert(message);
       }
     } catch (err) {
-      alert("Không thể kết nối tới server.");
+      // Đây là lỗi network thật sự (server không phản hồi)
+      alert('Không thể kết nối tới server. Kiểm tra lại backend đang chạy.');
     } finally {
       setIsImporting(false);
     }
@@ -196,6 +241,33 @@ export default function App() {
     if (view === 'month') return format(currentDate, 'MMMM yyyy', { locale: vi });
     return format(currentDate, 'yyyy');
   }, [view, currentDate]);
+
+  const navigate = (direction: 1 | -1) => {
+    setCurrentDate(prev => {
+      if (view === 'day') return direction === 1 ? addDays(prev, 1) : subDays(prev, 1);
+      if (view === 'week') return direction === 1 ? addWeeks(prev, 1) : subWeeks(prev, 1);
+      if (view === 'month') return direction === 1 ? addMonths(prev, 1) : subMonths(prev, 1);
+      return direction === 1 ? addYears(prev, 1) : subYears(prev, 1);
+    });
+  };
+
+  // Days trong picker month để render grid
+  const pickerDays = useMemo(() => {
+    const start = startOfWeek(startOfMonth(pickerMonth), { weekStartsOn: 1 });
+    const end = endOfWeek(endOfMonth(pickerMonth), { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [pickerMonth]);
+
+  const handlePickerDateSelect = (date: Date) => {
+    setCurrentDate(date);
+    setShowDatePicker(false);
+    if (view !== 'day') setView('day');
+  };
+
+  const openDatePicker = () => {
+    setPickerMonth(currentDate);
+    setShowDatePicker(prev => !prev);
+  };
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 text-slate-900">
@@ -225,7 +297,7 @@ export default function App() {
         </div>
       )}
 
-      <aside className="w-full lg:w-96 bg-white border-r border-slate-200 flex flex-col p-6 space-y-6 lg:sticky lg:top-0 h-screen overflow-y-auto z-10 custom-scrollbar">
+      <aside className="w-full lg:w-96 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col p-6 space-y-6 lg:sticky lg:top-0 h-screen overflow-y-auto z-10 custom-scrollbar">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tight">
             <Layers className="w-8 h-8" strokeWidth={3} />
@@ -276,25 +348,108 @@ export default function App() {
           </div>
         </div>
 
-        <GeminiAssistant bookings={bookings} rooms={ROOMS} />
-
         <div className="space-y-3 pt-2">
-          <button onClick={() => { if (!auth.user) setIsAuthModalOpen(true); else fileInputRef.current?.click(); }} className="w-full bg-white text-indigo-600 px-5 py-4 rounded-2xl flex items-center gap-4 hover:bg-indigo-50 transition-all border border-indigo-100 font-black text-xs uppercase tracking-widest">
+          <button onClick={() => { if (!auth.user) setIsAuthModalOpen(true); else setIsImportModalOpen(true); }} className="w-full bg-white text-indigo-600 px-5 py-4 rounded-2xl flex items-center gap-4 hover:bg-indigo-50 transition-all border border-indigo-100 font-black text-xs uppercase tracking-widest">
             <FileUp className="w-5 h-5" /> Nhập lịch thi (Excel)
           </button>
-          <input type="file" ref={fileInputRef} onChange={() => {}} className="hidden" />
           <button onClick={() => { if (!auth.user) setIsAuthModalOpen(true); else setIsStatsModalOpen(true); }} className="w-full bg-white text-slate-600 px-5 py-4 rounded-2xl flex items-center gap-4 hover:bg-slate-100 transition-all border border-slate-200 font-black text-xs uppercase tracking-widest">
             <BarChart3 className="w-5 h-5" /> Thống kê báo cáo
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col p-4 lg:p-8 space-y-4 max-w-7xl mx-auto w-full">
+      <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col p-4 lg:p-8 space-y-4 max-w-7xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex bg-white rounded-2xl shadow-sm border border-slate-200 p-1">
-            <button onClick={() => setCurrentDate(prev => subDays(prev, 1))} className="p-2 hover:bg-slate-50 rounded-xl text-slate-600"><ChevronLeft className="w-5 h-5"/></button>
-            <div className="px-4 flex items-center font-bold text-slate-800 text-sm md:text-base min-w-[180px] justify-center capitalize">{headerTitle}</div>
-            <button onClick={() => setCurrentDate(prev => addDays(prev, 1))} className="p-2 hover:bg-slate-50 rounded-xl text-slate-600"><ChevronRight className="w-5 h-5"/></button>
+          <div className="relative" ref={datePickerRef}>
+            <div className="flex bg-white rounded-2xl shadow-sm border border-slate-200 p-1">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-2 hover:bg-slate-50 rounded-xl text-slate-600 transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5"/>
+              </button>
+              <button
+                onClick={openDatePicker}
+                className="px-4 flex items-center font-bold text-slate-800 text-sm md:text-base min-w-[180px] justify-center capitalize hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-all gap-2 group"
+              >
+                {headerTitle}
+                <CalendarIcon className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+              </button>
+              <button
+                onClick={() => navigate(1)}
+                className="p-2 hover:bg-slate-50 rounded-xl text-slate-600 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5"/>
+              </button>
+            </div>
+
+            {/* Date Picker Popup */}
+            {showDatePicker && (
+              <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 w-80 animate-in fade-in zoom-in-95 duration-200">
+                {/* Picker header: điều hướng tháng */}
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => setPickerMonth(prev => subMonths(prev, 1))}
+                    className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-black text-slate-800 capitalize">
+                    {format(pickerMonth, 'MMMM yyyy', { locale: vi })}
+                  </span>
+                  <button
+                    onClick={() => setPickerMonth(prev => addMonths(prev, 1))}
+                    className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Tên thứ */}
+                <div className="grid grid-cols-7 mb-2">
+                  {['T2','T3','T4','T5','T6','T7','CN'].map(d => (
+                    <div key={d} className="text-center text-[10px] font-black text-slate-400 uppercase py-1">{d}</div>
+                  ))}
+                </div>
+
+                {/* Grid ngày */}
+                <div className="grid grid-cols-7 gap-1">
+                  {pickerDays.map(day => {
+                    const isCurrentMonth = isSameMonth(day, pickerMonth);
+                    const isToday = isSameDay(day, new Date());
+                    const isSelected = isSameDay(day, currentDate);
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        onClick={() => handlePickerDateSelect(day)}
+                        className={`
+                          w-full aspect-square rounded-xl text-xs font-bold transition-all
+                          ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                              : isToday
+                              ? 'bg-indigo-50 text-indigo-600 ring-2 ring-indigo-200'
+                              : isCurrentMonth
+                              ? 'text-slate-700 hover:bg-slate-100'
+                              : 'text-slate-300 hover:bg-slate-50'
+                          }
+                        `}
+                      >
+                        {format(day, 'd')}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Nút Today */}
+                <button
+                  onClick={() => handlePickerDateSelect(new Date())}
+                  className="mt-4 w-full py-2.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 text-xs font-black uppercase tracking-widest rounded-2xl transition-all border border-slate-100 hover:border-indigo-100"
+                >
+                  Hôm nay
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => { if (!auth.user) setIsAuthModalOpen(true); else { setPreSelectedRoomId(undefined); setIsBookingModalOpen(true); } }} className="bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-xl shadow-indigo-100 active:scale-95">
@@ -305,7 +460,7 @@ export default function App() {
 
         {view === 'day' ? (
           <section className="bg-white rounded-[2rem] px-8 py-6 border border-slate-200 shadow-sm overflow-hidden">
-            <h3 className="text-lg font-black text-slate-900 mb-4">Sơ đồ tầng tòa B1</h3>
+            <h3 className="text-lg font-black text-slate-900 mb-4">Sơ đồ tòa B1</h3>
             <BuildingMap rooms={ROOMS} bookings={filteredBookings} onRoomClick={(room) => {
               const b = filteredBookings.find(b => b.roomId === room.id);
               if (b) setViewBooking(b); else { if (!auth.user) setIsAuthModalOpen(true); else { setPreSelectedRoomId(room.id); setIsBookingModalOpen(true); } }
@@ -316,25 +471,17 @@ export default function App() {
         )}
       </main>
 
-      {isBookingModalOpen && <BookingModal onClose={() => {setIsBookingModalOpen(false); setPreSelectedRoomId(undefined);}} onSubmit={handleCreateBooking} initialDate={currentDate} initialShift={selectedShift} initialRoomId={preSelectedRoomId} rooms={ROOMS} bookings={bookings} />}
+      {isBookingModalOpen && <BookingModal onClose={() => {setIsBookingModalOpen(false); setPreSelectedRoomId(undefined); setEditingBooking(null);}} onSubmit={editingBooking ? handleEditBooking : handleCreateBooking} initialDate={currentDate} initialShift={selectedShift} initialRoomId={preSelectedRoomId} rooms={ROOMS} bookings={bookings} editingBooking={editingBooking} />}
       {isDutyModalOpen && <DutyStaffModal onClose={() => setIsDutyModalOpen(false)} onSubmit={() => {}} initialDate={currentDate} initialShift={selectedShift} />}
       {isConfigModalOpen && <ConfigModal onClose={() => setIsConfigModalOpen(false)} config={importConfig} weeks={academicWeeks} onSaveConfig={setImportConfig} onSaveWeeks={setAcademicWeeks} />}
       {isStatsModalOpen && <StatsModal onClose={() => setIsStatsModalOpen(false)} bookings={bookings} rooms={ROOMS} />}
-      {viewBooking && <BookingDetailModal booking={viewBooking} onClose={() => setViewBooking(null)} now={now} />}
+      {viewBooking && <BookingDetailModal booking={viewBooking} onClose={() => setViewBooking(null)} onEdit={(booking) => { setViewBooking(null); setEditingBooking(booking); setIsBookingModalOpen(true); }} now={now} />}
       
-      {pendingImport && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-8 animate-in slide-in-from-bottom-10 duration-500">
-            <h3 className="text-2xl font-black mb-4 tracking-tight">Xác nhận nhập dữ liệu bảo mật</h3>
-            <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6">
-              <p className="text-amber-800 text-sm font-medium">Tìm thấy <strong>{pendingImport.totalFound}</strong> lịch thi. Bạn đang ghi dữ liệu vào MongoDB với quyền hạn của <strong>{auth.user?.fullName}</strong>.</p>
-            </div>
-            <div className="flex gap-4">
-              <button onClick={() => setPendingImport(null)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">Hủy bỏ</button>
-              <button onClick={confirmImport} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold">Lưu vào DB</button>
-            </div>
-          </div>
-        </div>
+      {isImportModalOpen && (
+        <ImportExcelModal
+          onClose={() => setIsImportModalOpen(false)}
+          onConfirm={handleImportConfirm}
+        />
       )}
     </div>
   );

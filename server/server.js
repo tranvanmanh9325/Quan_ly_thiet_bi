@@ -25,8 +25,20 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json({ limit: '10kb' })); 
-const importLimit = express.json({ limit: '50mb' });
+/**
+ * Dùng path-conditional body parser để route /api/bookings/import
+ * nhận limit 50mb, các route khác giữ limit 10kb vì lý do bảo mật.
+ * Lý do: global app.use(express.json()) chạy trước tất cả route handlers,
+ * nên route-specific middleware không thể override được limit đã bị reject.
+ */
+app.use((req, res, next) => {
+  if (req.path === '/api/bookings/import') {
+    express.json({ limit: '50mb' })(req, res, next);
+  } else {
+    express.json({ limit: '10kb' })(req, res, next);
+  }
+});
+
 
 // --- SECURITY UTILS ---
 
@@ -88,12 +100,13 @@ const UserSchema = new mongoose.Schema({
 });
 
 const BookingSchema = new mongoose.Schema({
-  roomId: { type: String, required: true, maxlength: 10 },
-  date: { type: String, required: true },
-  shift: { type: String, required: true },
-  user: { type: String, required: true, maxlength: 100 },
+  roomId:  { type: String, required: true, maxlength: 10 },
+  date:    { type: String, required: true },
+  shift:   { type: String, required: true },
+  user:    { type: String, required: true, maxlength: 100 },
   purpose: { type: String, required: true, maxlength: 500 },
-  proctor: { type: String, required: true, maxlength: 100 }
+  // proctor có thể rỗng với phòng thi không có CB được ghi rõ trong Excel
+  proctor: { type: String, default: '', maxlength: 100 }
 });
 
 const User = mongoose.model('User', UserSchema);
@@ -206,15 +219,63 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/bookings/import', importLimit, authenticateToken, async (req, res) => {
+app.put('/api/bookings/:id', authenticateToken, async (req, res) => {
+  try {
+    const data = sanitizeInput(req.body);
+    const { id } = req.params;
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: 'Không tìm thấy lịch thi này' });
+
+    // Check conflict with other bookings (exclude current one)
+    const conflict = await Booking.findOne({
+      _id: { $ne: id },
+      roomId: data.roomId,
+      date: data.date,
+      shift: data.shift
+    });
+    if (conflict) return res.status(400).json({ message: 'Phòng đã có lịch thi khác trong kíp này.' });
+
+    Object.assign(booking, data);
+    await booking.save();
+    res.json(booking);
+  } catch (err) {
+    console.error('Update Booking Error:', err);
+    res.status(500).json({ message: 'Lỗi cập nhật lịch thi' });
+  }
+});
+
+app.post('/api/bookings/import', authenticateToken, async (req, res) => {
   try {
     const { bookings } = sanitizeInput(req.body);
-    const deleteConditions = bookings.map(b => ({ roomId: b.roomId, date: b.date, shift: b.shift }));
-    await Booking.deleteMany({ $or: deleteConditions });
-    const result = await Booking.insertMany(bookings);
+
+    if (!Array.isArray(bookings) || bookings.length === 0) {
+      return res.status(400).json({ message: 'Dữ liệu không hợp lệ: bookings phải là mảng không rỗng' });
+    }
+
+    // Strip field 'id' từ frontend trước khi insert
+    // (Mongoose map 'id' vào virtual _id gây CastError nếu không phải ObjectId hợp lệ)
+    const cleanBookings = bookings.map(({ id, _id, ...rest }) => ({
+      ...rest,
+      proctor: rest.proctor || '', // đảm bảo không undefined
+    }));
+
+    const deleteConditions = cleanBookings.map(b => ({ roomId: b.roomId, date: b.date, shift: b.shift }));
+    if (deleteConditions.length > 0) {
+      await Booking.deleteMany({ $or: deleteConditions });
+    }
+
+    // ordered: false → tiếp tục insert các record khác ngay cả khi 1 record bị lỗi
+    const result = await Booking.insertMany(cleanBookings, { ordered: false });
     res.json({ message: 'Import thành công', count: result.length });
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi import' });
+    console.error('❌ Import Error:', err.message || err);
+    // insertMany với ordered:false báo lỗi nhưng vẫn insert được một phần
+    if (err.name === 'MongoBulkWriteError') {
+      const inserted = err.result?.insertedCount ?? 0;
+      return res.json({ message: `Import hoàn tất (${err.writeErrors?.length || 0} bị bỏ qua)`, count: inserted });
+    }
+    res.status(500).json({ message: `Lỗi import: ${err.message}` });
   }
 });
 

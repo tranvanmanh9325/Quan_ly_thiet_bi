@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, Calendar, Clock, User, FileText, LayoutGrid, ShieldCheck, Tag } from 'lucide-react';
+import { X, Calendar, Clock, User, FileText, LayoutGrid, ShieldCheck, Tag, Pencil } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Booking, Shift } from '../types';
@@ -9,10 +9,11 @@ import { SHIFT_DETAILS } from '../constants';
 interface BookingDetailModalProps {
   booking: Booking;
   onClose: () => void;
+  onEdit?: (booking: Booking) => void;
   now: Date;
 }
 
-const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ booking, onClose, now }) => {
+const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ booking, onClose, onEdit, now }) => {
   const isShiftActive = (shift: Shift, date: string) => {
     if (!isSameDay(new Date(date), now)) return false;
     const times = SHIFT_DETAILS[shift];
@@ -95,12 +96,23 @@ const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ booking, onClos
             </div>
           </div>
 
-          <button 
-            onClick={onClose}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm tracking-widest uppercase hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-95"
-          >
-            Đóng thông tin
-          </button>
+          <div className="flex gap-3">
+            {onEdit && (
+              <button 
+                onClick={() => onEdit(booking)}
+                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm tracking-widest uppercase hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Pencil className="w-4 h-4" />
+                Chỉnh sửa
+              </button>
+            )}
+            <button 
+              onClick={onClose}
+              className={`py-4 bg-slate-900 text-white rounded-2xl font-black text-sm tracking-widest uppercase hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-95 ${onEdit ? 'flex-1' : 'w-full'}`}
+            >
+              Đóng thông tin
+            </button>
+          </div>
         </div>
       </div>
     </div>

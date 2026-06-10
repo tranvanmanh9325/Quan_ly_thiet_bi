@@ -1,24 +1,30 @@
 
 import { Room, Shift, ImportConfig, AcademicWeek } from './types';
 
-export const ROOMS: Room[] = [
-  // Tầng 1 (4 phòng) - Chỉ có ở cánh phải
-  { id: '106', floor: 1, wing: 'right' },
-  { id: '107', floor: 1, wing: 'right' },
-  { id: '108', floor: 1, wing: 'right' },
-  { id: '109', floor: 1, wing: 'right' },
+// Generate rooms for 10 floors dynamically
+const generateRooms = (): Room[] => {
+  const rooms: Room[] = [];
 
-  // Tầng 2 (7 phòng)
-  // Cánh trái (3 phòng)
-  { id: '202', floor: 2, wing: 'left' },
-  { id: '203', floor: 2, wing: 'left' },
-  { id: '204', floor: 2, wing: 'left' },
-  // Cánh phải (4 phòng)
-  { id: '206', floor: 2, wing: 'right' },
-  { id: '207', floor: 2, wing: 'right' },
-  { id: '208', floor: 2, wing: 'right' },
-  { id: '209', floor: 2, wing: 'right' },
-];
+  for (let floor = 1; floor <= 10; floor++) {
+    const prefix = floor.toString();
+
+    // Left wing: rooms X02, X03, X04 (Floors 2-10 only)
+    if (floor >= 2) {
+      for (let r = 2; r <= 4; r++) {
+        rooms.push({ id: `${prefix}0${r}`, floor, wing: 'left' });
+      }
+    }
+
+    // Right wing: rooms X06, X07, X08, X09
+    for (let r = 6; r <= 9; r++) {
+      rooms.push({ id: `${prefix}0${r}`, floor, wing: 'right' });
+    }
+  }
+
+  return rooms;
+};
+
+export const ROOMS: Room[] = generateRooms();
 
 export const SHIFTS = Object.values(Shift);
 
