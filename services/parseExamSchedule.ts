@@ -62,26 +62,62 @@ function parseDateFromFlatFormat(text: string): Date | null {
 }
 
 /**
- * Tách mã học phần và cán bộ trông thi từ cell value.
+ * Tách thông tin học phần, mã lớp thi, giảng viên và cán bộ trông thi từ cell value.
  * Ví dụ:
- *   "IT3190 - HaiPV"     → { subject: "IT3190", proctor: "HaiPV" }
- *   "IT3080E (NgocTN)"   → { subject: "IT3080E", proctor: "NgocTN" }
- *   "IT4931"             → { subject: "IT4931", proctor: "" }
+ *   "IT3190 - HaiPV"     → { subject: "IT3190", proctor: "HaiPV", moduleName: "IT3190", ... }
+ *   "IT4409-161623-ThànhNT" → moduleName: "IT4409", examClassCode: "161623", user: "ThànhNT"
  */
-function parseSubjectCell(raw: string | null | undefined): { subject: string; proctor: string } | null {
+function parseSubjectCell(raw: string | null | undefined): { 
+  subject: string; 
+  proctor: string;
+  moduleName: string;
+  examClassCode: string;
+  user: string;
+} | null {
   if (!raw || typeof raw !== 'string') return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
+  let subject = trimmed;
+  let proctor = '';
+
+  // 1. Tách proctor nếu có khoảng trắng + "-" hoặc ngoặc
   // Dạng "IT3190 - HaiPV"
   const dashMatch = trimmed.match(/^(.+?)\s+-\s+(.+)$/);
-  if (dashMatch) return { subject: dashMatch[1].trim(), proctor: dashMatch[2].trim() };
+  if (dashMatch) {
+     subject = dashMatch[1].trim();
+     proctor = dashMatch[2].trim();
+  } else {
+    // Dạng "IT3080E (NgocTN)"
+    const parenMatch = trimmed.match(/^(.+?)\s+\((.+?)\)$/);
+    if (parenMatch) {
+       subject = parenMatch[1].trim();
+       proctor = parenMatch[2].trim();
+    }
+  }
 
-  // Dạng "IT3080E (NgocTN)"
-  const parenMatch = trimmed.match(/^(.+?)\s+\((.+?)\)$/);
-  if (parenMatch) return { subject: parenMatch[1].trim(), proctor: parenMatch[2].trim() };
+  // 2. Phân tích subject (VD: "IT4409-161623-ThànhNT", "IT3230-Trần Đức Duy", "IT4082")
+  let moduleName = subject;
+  let examClassCode = '';
+  let user = '';
 
-  return { subject: trimmed, proctor: '' };
+  const parts = subject.split('-');
+  if (parts.length >= 3) {
+    moduleName = parts[0].trim();
+    examClassCode = parts[1].trim();
+    user = parts.slice(2).join('-').trim();
+  } else if (parts.length === 2) {
+    moduleName = parts[0].trim();
+    const secondPart = parts[1].trim();
+    // Nếu phần 2 toàn số, khả năng cao là mã lớp thi
+    if (/^\d+$/.test(secondPart)) {
+      examClassCode = secondPart;
+    } else {
+      user = secondPart;
+    }
+  }
+
+  return { subject, proctor, moduleName, examClassCode, user };
 }
 
 /**
@@ -262,17 +298,16 @@ export function parseExamSheet(ws: XLSX.WorkSheet, sheetName: string): SheetPars
         const parsed = parseSubjectCell(String(cellValue));
         if (!parsed) continue;
 
-        // Mặc định cho dạng bảng chưa có Tên HP / Mã lớp trong nội dung.
-        // Có thể mở rộng parsing tùy thuộc vào định dạng chuỗi cell.
+        // Gán các trường đã tách vào Booking
         result.bookings.push({
           roomId,
           date: day.date.toISOString(),
           shift,
-          user: parsed.subject,   // Mã môn thi (VD: "IT1108")
-          purpose: parsed.subject, // Mã môn thi
+          user: parsed.user || '',   // Giảng viên
+          purpose: parsed.subject, // Nội dung gốc hoặc môn thi
           proctor: parsed.proctor, // Cán bộ trông thi (nếu có)
-          examClassCode: '',
-          moduleName: parsed.subject, // Tạm lấy subject làm moduleName
+          examClassCode: parsed.examClassCode || '',
+          moduleName: parsed.moduleName || parsed.subject,
         });
       }
     }

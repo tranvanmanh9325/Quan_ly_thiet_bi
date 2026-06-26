@@ -103,7 +103,7 @@ const BookingSchema = new mongoose.Schema({
   roomId:  { type: String, required: true, maxlength: 10 },
   date:    { type: String, required: true },
   shift:   { type: String, required: true },
-  user:    { type: String, required: true, maxlength: 100 },
+  user:    { type: String, default: '', maxlength: 100 },
   purpose: { type: String, required: true, maxlength: 500 },
   // proctor có thể rỗng với phòng thi không có CB được ghi rõ trong Excel
   proctor: { type: String, default: '', maxlength: 100 },
