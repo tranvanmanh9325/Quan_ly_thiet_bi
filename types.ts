@@ -32,6 +32,8 @@ export interface Booking {
   user: string;
   purpose: string;
   proctor: string;
+  examClassCode?: string;
+  moduleName?: string;
 }
 
 export interface DutyStaff {

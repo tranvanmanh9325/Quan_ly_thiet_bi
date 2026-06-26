@@ -106,7 +106,9 @@ const BookingSchema = new mongoose.Schema({
   user:    { type: String, required: true, maxlength: 100 },
   purpose: { type: String, required: true, maxlength: 500 },
   // proctor có thể rỗng với phòng thi không có CB được ghi rõ trong Excel
-  proctor: { type: String, default: '', maxlength: 100 }
+  proctor: { type: String, default: '', maxlength: 100 },
+  examClassCode: { type: String, default: '', maxlength: 50 },
+  moduleName: { type: String, default: '', maxlength: 200 }
 });
 
 const User = mongoose.model('User', UserSchema);
@@ -199,7 +201,11 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/bookings', async (req, res) => {
   try {
     const bookings = await Booking.find().sort({ date: 1 });
-    res.json(bookings);
+    res.json(bookings.map(b => {
+      const obj = b.toObject();
+      obj.id = obj._id;
+      return obj;
+    }));
   } catch (err) {
     res.status(500).json({ message: 'Lỗi khi lấy dữ liệu' });
   }
@@ -213,7 +219,9 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
 
     const newBooking = new Booking(data);
     await newBooking.save();
-    res.status(201).json(newBooking);
+    const obj = newBooking.toObject();
+    obj.id = obj._id;
+    res.status(201).json(obj);
   } catch (err) {
     res.status(500).json({ message: 'Lỗi lưu dữ liệu' });
   }
@@ -238,7 +246,9 @@ app.put('/api/bookings/:id', authenticateToken, async (req, res) => {
 
     Object.assign(booking, data);
     await booking.save();
-    res.json(booking);
+    const obj = booking.toObject();
+    obj.id = obj._id;
+    res.json(obj);
   } catch (err) {
     console.error('Update Booking Error:', err);
     res.status(500).json({ message: 'Lỗi cập nhật lịch thi' });

@@ -81,6 +81,8 @@ export default function ImportExcelModal({ onClose, onConfirm }: Props) {
         user:    b.user,
         purpose: b.purpose,
         proctor: b.proctor || '',
+        examClassCode: b.examClassCode,
+        moduleName: b.moduleName
       }))
     );
     onConfirm(allBookings);
@@ -149,7 +151,7 @@ export default function ImportExcelModal({ onClose, onConfirm }: Props) {
                   <div className="flex flex-col items-center gap-2">
                     <FileSpreadsheet className="w-10 h-10 text-slate-300" />
                     <p className="font-bold text-slate-500 text-sm">Click để chọn file Excel</p>
-                    <p className="text-xs text-slate-400">Hỗ trợ .xlsx, .xls — định dạng Tuan_Thi_20251_PhongMayTinh</p>
+                    <p className="text-xs text-slate-400">Hỗ trợ .xlsx, .xls — định dạng Tuan_Thi... hoặc Lich_Thi_Preview...</p>
                   </div>
                 )}
               </label>
@@ -181,7 +183,7 @@ export default function ImportExcelModal({ onClose, onConfirm }: Props) {
                   {examSheets.length === 0 && (
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
                       <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-amber-700">Không tìm thấy sheet lịch thi (TuanXX) trong file này.</p>
+                      <p className="text-sm text-amber-700">Không tìm thấy sheet lịch thi (TuanXX hoặc Lịch nhập) trong file này.</p>
                     </div>
                   )}
                 </div>
@@ -248,33 +250,39 @@ export default function ImportExcelModal({ onClose, onConfirm }: Props) {
                 </div>
               </div>
 
-              {/* Sample preview (5 dòng đầu) */}
-              {parseResults[0]?.bookings.length > 0 && (
+              {/* Chi tiết dữ liệu (Tất cả) */}
+              {totalBookings > 0 && (
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                    <Table2 className="w-3 h-3" /> Mẫu dữ liệu (5 dòng đầu)
+                    <Table2 className="w-3 h-3" /> Chi tiết dữ liệu ({totalBookings} dòng)
                   </label>
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto overflow-y-auto max-h-72 custom-scrollbar">
                     <table className="w-full text-xs whitespace-nowrap">
-                      <thead className="bg-slate-50">
+                      <thead className="bg-slate-50 sticky top-0 z-10">
                         <tr>
-                          <th className="text-left px-3 py-2 font-black text-slate-400">Phòng</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-400">Ngày</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-400">Kíp</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-400">Môn thi</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-400">CB Trông thi</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">Phòng</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">Ngày</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">Kíp</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">Giảng viên</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">Mã lớp thi</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">Tên học phần</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">CB Trông thi</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 border-b border-slate-200">Nội dung gốc</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {parseResults[0].bookings.slice(0, 5).map((b, i) => (
+                        {parseResults.flatMap(r => r.bookings).map((b, i) => (
                           <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                            <td className="px-3 py-2 font-bold text-indigo-600">B1-{b.roomId}</td>
-                            <td className="px-3 py-2 text-slate-600">
+                            <td className="px-3 py-2 font-bold text-indigo-600 border-b border-slate-100">B1-{b.roomId}</td>
+                            <td className="px-3 py-2 text-slate-600 border-b border-slate-100">
                               {new Date(b.date).toLocaleDateString('vi-VN')}
                             </td>
-                            <td className="px-3 py-2 text-slate-500 text-[11px]">{b.shift}</td>
-                            <td className="px-3 py-2 font-bold text-slate-700">{b.purpose}</td>
-                            <td className="px-3 py-2 text-slate-500">{b.proctor || '—'}</td>
+                            <td className="px-3 py-2 text-slate-500 text-[11px] border-b border-slate-100">{b.shift}</td>
+                            <td className="px-3 py-2 font-bold text-slate-700 border-b border-slate-100">{b.user || '—'}</td>
+                            <td className="px-3 py-2 font-bold text-slate-700 border-b border-slate-100">{b.examClassCode || '—'}</td>
+                            <td className="px-3 py-2 font-bold text-slate-700 border-b border-slate-100">{b.moduleName || '—'}</td>
+                            <td className="px-3 py-2 text-slate-500 border-b border-slate-100">{b.proctor || '—'}</td>
+                            <td className="px-3 py-2 text-slate-400 text-[10px] border-b border-slate-100 truncate max-w-[150px]" title={b.purpose}>{b.purpose}</td>
                           </tr>
                         ))}
                       </tbody>

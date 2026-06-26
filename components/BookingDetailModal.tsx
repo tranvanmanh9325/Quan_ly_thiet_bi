@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, Calendar, Clock, User, FileText, LayoutGrid, ShieldCheck, Tag, Pencil } from 'lucide-react';
+import { X, Calendar, Clock, User, FileText, LayoutGrid, ShieldCheck, Tag, Pencil, Hash, BookOpen } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Booking, Shift } from '../types';
@@ -94,6 +94,20 @@ const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ booking, onClos
                 <p className="text-sm font-medium text-slate-600 italic bg-slate-50 p-4 rounded-2xl border border-slate-100 leading-relaxed">"{booking.purpose}"</p>
               </div>
             </div>
+
+            {(booking.examClassCode || booking.moduleName) && (
+              <div className="flex items-start gap-4">
+                <div className="mt-1"><BookOpen className="w-4 h-4 text-indigo-400" /></div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Học phần & Mã lớp thi</p>
+                  <p className="text-base font-bold text-slate-800 leading-tight">
+                    {booking.moduleName && <span>{booking.moduleName}</span>}
+                    {booking.moduleName && booking.examClassCode && <span className="mx-2 text-slate-300">|</span>}
+                    {booking.examClassCode && <span className="text-indigo-600">Mã lớp: {booking.examClassCode}</span>}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3">

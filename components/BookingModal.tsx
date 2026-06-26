@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar as CalendarIcon, Clock, User, FileText, LayoutGrid, AlertCircle, ShieldCheck } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Clock, User, FileText, LayoutGrid, AlertCircle, ShieldCheck, Hash, BookOpen } from 'lucide-react';
 import { format, isSameDay, parseISO } from 'date-fns';
 import { Room, Shift, Booking } from '../types';
 import { SHIFTS } from '../constants';
@@ -21,11 +21,13 @@ const BookingModal: React.FC<BookingModalProps> = ({ onClose, onSubmit, initialD
 
   const [formData, setFormData] = useState({
     roomId: editingBooking?.roomId || initialRoomId || '106',
-    date: editingBooking ? editingBooking.date : format(initialDate, 'yyyy-MM-dd'),
+    date: editingBooking ? format(new Date(editingBooking.date), 'yyyy-MM-dd') : format(initialDate, 'yyyy-MM-dd'),
     shift: editingBooking?.shift || initialShift,
     user: editingBooking?.user || '',
     purpose: editingBooking?.purpose || '',
-    proctor: editingBooking?.proctor || ''
+    proctor: editingBooking?.proctor || '',
+    examClassCode: editingBooking?.examClassCode || '',
+    moduleName: editingBooking?.moduleName || ''
   });
 
   // Re-sync if props change while modal is somehow still open or remounting
@@ -153,6 +155,35 @@ const BookingModal: React.FC<BookingModalProps> = ({ onClose, onSubmit, initialD
                 value={formData.proctor}
                 onChange={e => setFormData({...formData, proctor: e.target.value})}
                 required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-500 flex items-center gap-2">
+                <Hash className="w-3.5 h-3.5" />
+                Mã lớp thi
+              </label>
+              <input 
+                type="text"
+                placeholder="VD: 164907"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500"
+                value={formData.examClassCode}
+                onChange={e => setFormData({...formData, examClassCode: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-500 flex items-center gap-2">
+                <BookOpen className="w-3.5 h-3.5" />
+                Tên Học phần
+              </label>
+              <input 
+                type="text"
+                placeholder="VD: Nhập môn lập trình..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500"
+                value={formData.moduleName}
+                onChange={e => setFormData({...formData, moduleName: e.target.value})}
               />
             </div>
           </div>

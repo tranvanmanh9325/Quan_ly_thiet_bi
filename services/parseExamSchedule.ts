@@ -8,6 +8,8 @@ export interface ParsedBooking {
   user: string;       // Mã học phần (môn thi)
   purpose: string;    // Tên đầy đủ trong cell
   proctor: string;    // Trích xuất từ suffix " - TenGV" hoặc "(TenGV)"
+  examClassCode?: string;
+  moduleName?: string;
 }
 
 export interface SheetParseResult {
@@ -42,6 +44,17 @@ function parseShiftFromText(text: string): Shift | null {
  */
 function parseDateFromHeader(text: string): Date | null {
   const m = String(text).match(/(\d{2})\.(\d{2})\.(\d{4})/);
+  if (!m) return null;
+  const [, day, month, year] = m;
+  const d = new Date(Number(year), Number(month) - 1, Number(day));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Parse ngày từ định dạng DD/MM/YYYY hoặc DD.MM.YYYY
+ */
+function parseDateFromFlatFormat(text: string): Date | null {
+  const m = String(text).match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
   if (!m) return null;
   const [, day, month, year] = m;
   const d = new Date(Number(year), Number(month) - 1, Number(day));
@@ -85,10 +98,14 @@ function parseRoomId(raw: string | null | undefined): string | null {
 
 /**
  * Phát hiện sheet lịch thi từ danh sách sheet.
- * Chỉ lấy sheet có tên khớp /^Tuan\d+/i (bỏ "TrucKyThuat", "LichThi...", v.v.)
+ * Lấy sheet có tên khớp /^Tuan\d+/i hoặc các sheet chứa "lịch nhập", "preview".
  */
 export function detectExamSheets(sheetNames: string[]): string[] {
-  return sheetNames.filter(name => /^Tuan\d+/i.test(name));
+  return sheetNames.filter(name => 
+    /^Tuan\d+/i.test(name) || 
+    name.toLowerCase().includes('lịch nhập') || 
+    name.toLowerCase().includes('preview')
+  );
 }
 
 /**
@@ -126,7 +143,64 @@ export function parseExamSheet(ws: XLSX.WorkSheet, sheetName: string): SheetPars
   const row0 = data[0] ?? [];
   const row1 = data[1] ?? [];
 
-  // Lấy label tuần từ cell A0
+  // Detect flat format (Lich_Thi_Preview)
+  const isFlatFormat = row0.length >= 6 && 
+    String(row0[0]).toLowerCase().includes('phòng') && 
+    String(row0[1]).toLowerCase().includes('ngày thi') && 
+    String(row0[2]).toLowerCase().includes('kíp');
+
+  if (isFlatFormat) {
+    result.weekLabel = sheetName;
+    for (let rowIdx = 1; rowIdx < data.length; rowIdx++) {
+      const row = data[rowIdx] ?? [];
+      const roomIdStr = String(row[0] ?? '').trim();
+      if (!roomIdStr) continue;
+
+      const roomId = parseRoomId(roomIdStr);
+      if (!roomId) continue;
+
+      const dateStr = String(row[1] ?? '').trim();
+      const dateParsed = parseDateFromFlatFormat(dateStr);
+      if (!dateParsed) continue;
+
+      const kipStr = String(row[2] ?? '').trim();
+      const shift = parseShiftFromText(kipStr);
+      if (!shift) continue;
+
+      const proctor = String(row[4] ?? '').trim();
+      const content = String(row[5] ?? '').trim();
+      const giangVien = String(row[3] ?? '').trim();
+
+      let subject = content;
+      let moduleName = '';
+      const hpMatch = content.match(/HP:\s*(.*?)(?:\.|$)/i);
+      if (hpMatch) {
+         subject = hpMatch[1].trim();
+         moduleName = hpMatch[1].trim();
+      }
+
+      let examClassCode = '';
+      const maLopMatch = content.match(/Mã lớp thi:\s*(\d+)/i);
+      if (maLopMatch) {
+         examClassCode = maLopMatch[1];
+      }
+
+      result.bookings.push({
+        roomId,
+        date: dateParsed.toISOString(),
+        shift,
+        user: giangVien || subject, // Use giangVien if present, else fallback to subject
+        purpose: content,
+        proctor: proctor.toLowerCase().includes('chưa phân công') ? '' : proctor,
+        examClassCode,
+        moduleName,
+      });
+    }
+
+    return result;
+  }
+
+  // Lấy label tuần từ cell A0 (cho dạng bảng TuanXX)
   result.weekLabel = String(row0[0] ?? sheetName);
 
   // ─── Bước 1: Build column map ────────────────────────────────────────────
@@ -188,6 +262,8 @@ export function parseExamSheet(ws: XLSX.WorkSheet, sheetName: string): SheetPars
         const parsed = parseSubjectCell(String(cellValue));
         if (!parsed) continue;
 
+        // Mặc định cho dạng bảng chưa có Tên HP / Mã lớp trong nội dung.
+        // Có thể mở rộng parsing tùy thuộc vào định dạng chuỗi cell.
         result.bookings.push({
           roomId,
           date: day.date.toISOString(),
@@ -195,6 +271,8 @@ export function parseExamSheet(ws: XLSX.WorkSheet, sheetName: string): SheetPars
           user: parsed.subject,   // Mã môn thi (VD: "IT1108")
           purpose: parsed.subject, // Mã môn thi
           proctor: parsed.proctor, // Cán bộ trông thi (nếu có)
+          examClassCode: '',
+          moduleName: parsed.subject, // Tạm lấy subject làm moduleName
         });
       }
     }
